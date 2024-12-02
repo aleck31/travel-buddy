@@ -1,0 +1,13 @@
+gradio
+boto3
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Utilities
+python-dotenv
+python-multipart
+pillow
+python-jose[cryptography]
+passlib[bcrypt]
