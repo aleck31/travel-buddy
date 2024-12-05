@@ -1,0 +1,366 @@
+{
+    "shanghai": {
+        "airport": [
+            {
+                "name": "Pudong International Airport",
+                "code": "PVG",
+                "lounge": [
+                    {
+                        "name": "First Class Lounge No.9",
+                        "openingHours": "06:00 - Last Flight daily",
+                        "location": {
+                            "terminal": "Terminal 1",
+                            "area": "Domestic Departure",
+                            "details": "Airside - After passport control and security check, take the escalator near Departure Gate 9, then turn left to the lounge."
+                        },
+                        "amenities": [
+                            "Air Conditioning",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Flight Monitor",
+                            "Hot/Cold Food"
+                        ],
+                        "conditions": [
+                            "Maximum 2 hours stay",
+                            "Children under 2 years old are admitted free",
+                            "Guests should be on the same flight with the cardholder"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "First Class Lounge No.39",
+                        "openingHours": "06:00 - 22:00",
+                        "location": {
+                            "terminal": "Terminal 1",
+                            "area": "International Departure",
+                            "details": "Airside - After passport control and security check, the lounge is located near Departure Gate 18"
+                        },
+                        "amenities": [
+                            "Air Conditioning",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Hot/Cold Food",
+                            "Flight Monitor"
+                        ],
+                        "conditions": [
+                            "Maximum 2 hours stay",
+                            "Children under 2 years old are admitted free",
+                            "Domestic departures only",
+                            "Guests should be on the same flight with the cardholder"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "VIP Lounge No.69",
+                        "openingHours": "06:00 - 23:00",
+                        "location": {
+                            "terminal": "Terminal 2",
+                            "area": "International Departure",
+                            "details": "Airside - After passport control and security check, near Gate 69 on the Upper Floor. Signs indicate the entrance to the Lounge."
+                        },
+                        "amenities": [
+                            "Air Conditioning",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Flight Monitor",
+                            "Hot/Cold Food"
+                        ],
+                        "conditions": [
+                            "Maximum 2 hours stay",
+                            "Children under 2 years old are admitted free",
+                            "Guests should be on the same flight with the cardholder"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "First Class Lounge No.73",
+                        "openingHours": "06:00 - Last Flight",
+                        "location": {
+                            "terminal": "Terminal 2",
+                            "area": "Domestic Departure Level 2",
+                            "details": "Airside - After passport control and security check, proceed down to Level 2, turn right and walk straight around 100 meters, the lounge is opposite to the Boarding Gate 76, 100 meters to the Gate 73."
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Wifi Access",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Television",
+                            "Digital Card Accepted"
+                        ],
+                        "conditions": [
+                            "Maximum 2 hours stay",
+                            "Children under 2 years old are admitted free"
+                        ],
+                        "pointSpent": 3
+                    },
+                    {
+                        "name": "VIP Lounge No.190",
+                        "openingHours": "First Flight - Last Flight",
+                        "location": {
+                            "terminal": "Satellite Terminal S2",
+                            "area": "Domestic Departure",
+                            "details": "Satellite Hall S2, Level 4 Near Boarding Gate: 190. After arriving at the station by MRT, take the platform elevator to the 4th floor and go to the '190 VIP Lounge' (or take the escalator to the 2nd floor and take the elevator to the 4th floor opposite gate 190 or 170)."
+                        },
+                        "amenities": [
+                            "Air Conditioning",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Hot/Cold Food",
+                            "Flight Monitor"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "VIP Lounge No.135",
+                        "openingHours": "06:00-23:00",
+                        "location": {
+                            "terminal": "Terminal 1",
+                            "area": "International Departure",
+                            "details": "S1 Satellite Hall Near Boarding Gate: 135. Airside - After passport control and security check, the lounge is located near the Gate 135, take the down escalator at the verification gate between the security gates No.10-No.11 to the MRT platform, then take the MRT. After arriving at the station, take the elevator to the VIP Lounge No.135 on the 4th floor."
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Fruit",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Hot/Cold Food",
+                            "Flight Monitor"
+                        ],
+                        "pointSpent": 2
+                    }
+                ]
+            },
+            {
+                "name": "Hongqiao International Airport",
+                "code": "SHA",
+                "lounge": [
+                    {
+                        "name": "First Class Lounge V1",
+                        "openingHours": "05:30-Last Flight",
+                        "location": {
+                            "terminal": "Terminal 2",
+                            "area": "Domestic Departure",
+                            "details": "Level 3 Near Boarding Gate: 25-26 Airside - After security Check, the lounge is located near departure gate 25 & 26"
+                        },
+                        "amenities": [],
+                        "pointSpent": 1
+                    },
+                    {
+                        "name": "V03 VIP Lounge",
+                        "openingHours": "06:30 - 20:00 daily",
+                        "location": {
+                            "terminal": "Terminal 1",
+                            "area": "International Departure Level 4",
+                            "details": "Airside - After security check, take the escalator up to the V03 VIP Lounge on the fourth floor."
+                        },
+                        "amenities": [],
+                        "pointSpent": 1
+                    },
+                    {
+                        "name": "China Southern Airlines VIP Lounge V26",
+                        "openingHours": "06:20 - Last Flight",
+                        "location": {
+                            "terminal": "Terminal 2",
+                            "area": "Domestic Departure 3F",
+                            "details": "Airside - After passport control and security check,go straight south (to the right) to the VIP lounge V26. This lounge is only available for passengers taking China Southern domestic flights."
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Luggage Storage",
+                            "Wifi Access",
+                            "Fruit",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Television",
+                            "Snacks",
+                            "Massage Chairs",
+                            "Charging station"
+                        ],
+                        "pointSpent": 3
+                    },
+                    {
+                        "name": "V01 China Eastern Lounge",
+                        "status": "Temporarily Unavailable",
+                        "openingHours": "06:00 - Last Flight daily",
+                        "location": {
+                            "terminal": "Terminal 1",
+                            "area": "International Departure",
+                            "details": "Level 4 Airside - After passport control and security check, Terminal 1, International Departures, Level 4"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Alcoholic Beverages",
+                            "Wifi Access",
+                            "Fruit",
+                            "Shower Facility (Chargeable)",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Television",
+                            "Flight Monitor",
+                            "Digital Card Accepted"
+                        ],
+                        "conditions": [
+                            "Maximum 2 hours stay",
+                            "Children under 7 years old are admitted free"
+                        ],
+                        "pointSpent": 3
+                    }
+                ]
+            }
+        ]
+    },
+    "shenzhen": {
+        "airport": [
+            {
+                "name": "Bao'an International Airport",
+                "code": "SZX",
+                "lounge": [
+                    {
+                        "name": "JOYEE International Business Class Lounge",
+                        "openingHours": "24 hours daily",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "International Departure",
+                            "details": "Airside - After passport control and security check, turn right and then go straight, the lounge is located opposite Gate 9"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Fruit",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Television",
+                            "Snacks",
+                            "Hot/Cold Food",
+                            "Digital Card Accepted"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "China Southern Sky Pearl Club VIP",
+                        "openingHours": "6:30-China Southern Airlines flight ends at the latest",
+                        "location": {
+                            "terminal": "Satellite Terminal",
+                            "area": "Domestic Departure",
+                            "details": "Airside - After passport control and security check, the lounge is located on the lower ground floor of the escalator, and take the MRT to the satellite hall, upstairs of gate 560"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Toilets",
+                            "Wifi Access",
+                            "Fruit",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Television",
+                            "Snacks",
+                            "Massage Chairs",
+                            "Hot/Cold Food"
+                        ],
+                        "pointSpent": 3
+                    },
+                    {
+                        "name": "C24 Business VIP Lounge (Dom T3)",
+                        "openingHours": "06:00-22:00",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "Domestic Departure",
+                            "details": "Before security check, Domestic departure Hall, Level 4, Check-in Island C, check-in counter C24"
+                        },
+                        "amenities": [
+                            "Luggage Check-In Assistance",
+                            "Including the VIP lounge",
+                            "Check-In Assistance",
+                            "Digital Card Accepted"
+                        ],
+                        "pointSpent": 1
+                    },
+                    {
+                        "name": "VIP Service - Shenzhen Airport Domestic Guest Lounge",
+                        "openingHours": "06:00-22:00",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "Domestic Departure",
+                            "details": "After security check, the Lounge is on the left of the escalator"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Luggage Storage",
+                            "Vegetarian",
+                            "Alcoholic Beverages",
+                            "Wifi Access",
+                            "Fruit",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Noodles",
+                            "Flight Boarding Announcements",
+                            "Snacks",
+                            "Charging station",
+                            "Hot/Cold Food"
+                        ],
+                        "pointSpent": 3
+                    },
+                    {
+                        "name": "Shenzhen Airport Domestic VIP lounge 3(T3 - Intl)",
+                        "openingHours": "07:00-22:00",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "Domestic Departure",
+                            "details": "Airside - After passport control and security check, the lounge is located on the third floor of the Satellite hall"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Toilets",
+                            "Wifi Access",
+                            "Self-Service Dining",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Television",
+                            "Hot/Cold Food",
+                            "Flight Monitor"
+                        ],
+                        "pointSpent": 3
+                    },
+                    {
+                        "name": "International Business VIP Lounge",
+                        "openingHours": "07:00-22:00",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "International Departure",
+                            "details": "Airside - After passport control and security check, turn right and go straight ahead, the lounge is opposite to Gate 9"
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Printing",
+                            "Wifi Access",
+                            "Fruit",
+                            "Fax",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Snacks",
+                            "Digital Card Accepted"
+                        ],
+                        "pointSpent": 2
+                    },
+                    {
+                        "name": "VIP Service - Shenzhen Airport Domestic VIP Lounge 2",
+                        "openingHours": "07:00-22:00",
+                        "location": {
+                            "terminal": "Terminal 3",
+                            "area": "Domestic Departure",
+                            "details": "Airside - After passport control and security check, the lounge is located on the 3rd floor and goes straight to VIP Lounge 2 opposite Gate 39."
+                        },
+                        "amenities": [
+                            "Newspaper/Magazines",
+                            "Air Conditioning",
+                            "Non-Alcoholic Beverages (Hot/Cold)",
+                            "Television",
+                            "Snacks",
+                            "Flight Monitor",
+                            "Massage Chairs",
+                            "Computer Access"
+                        ],
+                        "pointSpent": 2
+                    }
+                ]
+            }
+        ]
+    }
+}

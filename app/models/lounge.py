@@ -5,15 +5,38 @@ from enum import Enum
 
 
 class LoungeAmenity(str, Enum):
-    WIFI = "wifi"
-    TV = "television"
-    FOOD = 'food'    
-    SNACKS = 'Snacks'
-    BUFFET = "buffet"
-    BAR = "bar"
-    QUIET_ZONE = "quiet_zone"
-    BUSINESS_CENTER = "business_center"
-    SLEEPING_PODS = "sleeping_pods"
+    # Basic Amenities
+    AIR_CONDITIONING = "Air Conditioning"
+    WIFI = "Wifi Access"
+    TELEVISION = "Television"
+    FLIGHT_MONITOR = "Flight Monitor"
+    TOILETS = "Toilets"
+    CHARGING_STATION = "Charging station"
+    DIGITAL_CARD = "Digital Card Accepted"
+    
+    # Food & Beverages
+    SNACKS = "Snacks"
+    HOT_COLD_FOOD = "Hot/Cold Food"
+    NON_ALCOHOLIC_BEVERAGES = "Non-Alcoholic Beverages (Hot/Cold)"
+    ALCOHOLIC_BEVERAGES = "Alcoholic Beverages"
+    FRUIT = "Fruit"
+    NOODLES = "Noodles"
+    VEGETARIAN = "Vegetarian"
+    SELF_SERVICE_DINING = "Self-Service Dining"
+    
+    # Business Services
+    NEWSPAPER_MAGAZINES = "Newspaper/Magazines"
+    PRINTING = "Printing"
+    FAX = "Fax"
+    COMPUTER_ACCESS = "Computer Access"
+    
+    # Additional Services
+    LUGGAGE_STORAGE = "Luggage Storage"
+    LUGGAGE_CHECK_IN = "Luggage Check-In Assistance"
+    CHECK_IN_ASSISTANCE = "Check-In Assistance"
+    MASSAGE_CHAIRS = "Massage Chairs"
+    SHOWER_FACILITY = "Shower Facility (Chargeable)"
+    FLIGHT_ANNOUNCEMENTS = "Flight Boarding Announcements"
 
 
 class BookingStatus(str, Enum):
@@ -31,7 +54,7 @@ class Lounge(BaseModel):
     location_description: str
     amenities: List[LoungeAmenity]
     operating_hours: str
-    max_stay_hours: int = 3
+    max_stay_hours: int = 2  # Most lounges specify 2 hours maximum stay
     distance_to_gate: Optional[str] = None
     rating: Optional[float] = None
     description: str

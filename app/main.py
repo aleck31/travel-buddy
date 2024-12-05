@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from gradio.routes import mount_gradio_app
 
 from .core import settings, app_logger
-from .ui.chat import chat_ui  # Import the specific chat_ui instance
+from .chatbot.chat_ui import chat_interface  # Import the specific chat_ui instance
 from .services import dynamodb_service
+
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -23,7 +24,7 @@ app.add_middleware(
 )
 
 # Create Gradio interface
-interface = chat_ui.create_interface()
+interface = chat_interface.create_interface()
 
 # Mount Gradio app to FastAPI
 app = mount_gradio_app(app, interface, path="/")
@@ -41,8 +42,6 @@ async def startup_event():
         app_logger.info("Successfully connected to DynamoDB table")
     except Exception as e:
         app_logger.error(f"Failed to connect to DynamoDB table: {str(e)}")
-        # In a production environment, you might want to raise the exception
-        # to prevent the application from starting with a broken DB connection
         app_logger.warning("Application starting without DynamoDB connection")
 
 @app.on_event("shutdown")
