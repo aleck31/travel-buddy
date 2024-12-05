@@ -1,4 +1,4 @@
-from .base import ToolResult
+from .base import Tool, ToolResult
 from ...core import app_logger
 from third_party.membership.service import membership_service
 
@@ -37,12 +37,20 @@ async def check_membership_points(user_id: str) -> ToolResult:
         )
 
 
-# Tool definition
-MEMBERSHIP_TOOLS = [
-    {
-        "name": "check_membership_points",
-        "description": "Check user's available lounge access points",
-        "parameters": {"user_id": "string"},
-        "required": ["user_id"]
-    }
-]
+# Tool definition using proper JSON schema format
+CHECK_MEMBERSHIP_POINTS_TOOL = Tool(
+    name="check_membership_points",
+    description="Retrieves a user's membership profile including available lounge access points, personal details like name and preferred language. This tool queries the membership database to fetch current point balance and member information.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "Unique identifier of the member whose profile should be retrieved"
+            }
+        }
+    },
+    required=["user_id"]
+)
+
+MEMBERSHIP_TOOLS = [CHECK_MEMBERSHIP_POINTS_TOOL]

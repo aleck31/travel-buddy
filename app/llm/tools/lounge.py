@@ -11,8 +11,14 @@ async def get_available_lounges(airport_code: str, terminal: Optional[str] = Non
     Get available lounges for a given airport with optional filtering by terminal and amenities
     """
     try:
-        # Initialize lounge service if needed
-        lounge_service.initialize()
+        # Initialize lounge service
+        if not lounge_service._initialized:
+            lounge_service.initialize()
+            if not lounge_service._initialized:
+                return ToolResult(
+                    success=False,
+                    error="Failed to initialize lounge service"
+                )
         
         # Search for lounges with the given criteria
         lounges = lounge_service.search_lounges(
@@ -35,7 +41,7 @@ async def get_available_lounges(airport_code: str, terminal: Optional[str] = Non
                     continue
             
             lounge_models.append(Lounge(
-                id=f"{airport_code}_{lounge.location.terminal}_{lounge.name[:2]}",
+                id=lounge.id,  # Use the ID from JSON data
                 name=lounge.name,
                 airport_code=airport_code,
                 terminal=lounge.location.terminal,
@@ -56,7 +62,7 @@ async def get_available_lounges(airport_code: str, terminal: Optional[str] = Non
         app_logger.error(f"Error getting available lounges: {str(e)}")
         return ToolResult(
             success=False,
-            error="Failed to retrieve available lounges"
+            error=f"Failed to retrieve available lounges: {str(e)}"
         )
 
 
@@ -70,10 +76,22 @@ async def book_lounge(
     Book a lounge for a user
     """
     try:
+        # Initialize lounge service
+        if not lounge_service._initialized:
+            lounge_service.initialize()
+            if not lounge_service._initialized:
+                return ToolResult(
+                    success=False,
+                    error="Failed to initialize lounge service"
+                )
+
+        # Normalize lounge_id to lowercase to handle case-insensitive matching
+        normalized_lounge_id = lounge_id.lower()
+
         # Create booking through the lounge service
         booking = await lounge_service.create_booking(
             user_id=user_id,
-            lounge_id=lounge_id,
+            lounge_id=normalized_lounge_id,
             flight_number=flight_number,
             arrival_time=arrival_time,
             phone_number="+1234567890"  # TODO: Get from user profile
@@ -82,7 +100,7 @@ async def book_lounge(
         if booking is None:
             return ToolResult(
                 success=False,
-                error="Insufficient points for booking"
+                error="Insufficient points for booking or lounge not found"
             )
         
         return ToolResult(
@@ -93,30 +111,53 @@ async def book_lounge(
         app_logger.error(f"Error booking lounge: {str(e)}")
         return ToolResult(
             success=False,
-            error="Failed to book lounge"
+            error=f"Failed to book lounge: {str(e)}"
         )
 
 
-# Tool definitions
+# Tool definitions with enhanced descriptions for Bedrock Converse API
 LOUNGE_TOOLS = [
     {
         "name": "get_available_lounges",
-        "description": "Get available lounges for a given airport",
+        "description": "Search for available airport VIP lounges based on airport code, with optional filtering by terminal and amenities",
         "parameters": {
-            "airport_code": "string",
-            "terminal": "string (optional)",
-            "amenities": "list[string] (optional)"
+            "airport_code": {
+                "type": "string",
+                "description": "Three-letter IATA airport code (e.g., SZX for Shenzhen, PVG for Shanghai Pudong)"
+            },
+            "terminal": {
+                "type": "string",
+                "description": "Optional terminal number or letter (e.g., T1, T2) to filter lounges"
+            },
+            "amenities": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional list of desired amenities (e.g., ['shower', 'wifi', 'buffet'])"
+            }
         },
         "required": ["airport_code"]
     },
     {
         "name": "book_lounge",
-        "description": "Book a lounge for a user",
+        "description": "Book a VIP lounge access for a user's upcoming flight",
         "parameters": {
-            "user_id": "string",
-            "lounge_id": "string",
-            "flight_number": "string",
-            "arrival_time": "datetime"
+            "user_id": {
+                "type": "string",
+                "description": "Unique identifier for the user making the booking"
+            },
+            "lounge_id": {
+                "type": "string",
+                "description": "Unique identifier for the lounge (e.g., pvg_t1_fl09 for Shanghai Pudong T1 First Class Lounge)"
+            },
+            "flight_number": {
+                "type": "string",
+                "description": "Flight number for the user's upcoming flight (e.g., CZ3456)"
+            },
+            "arrival_time": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Expected arrival time at the lounge in ISO 8601 format"
+            }
         },
         "required": ["user_id", "lounge_id", "flight_number", "arrival_time"]
     }

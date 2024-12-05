@@ -1,9 +1,7 @@
-import base64
-from pathlib import Path
-from typing import List, Tuple, AsyncGenerator, Generator
+# chat_handlers.py handles UI/API level interactions
+from typing import List, Tuple
 import logging
 import re
-from datetime import datetime
 
 from ...core import app_logger
 from ...models.chat import ChatMessage, MessageRole, BookingStage
@@ -11,12 +9,12 @@ from ..session_service import session_service
 from ..data_service import data_service
 from third_party.membership.service import membership_service
 from app.llm.bedrock import BedrockLLM
-from app.llm.tools import LLMTools
+from app.llm.tools.base import Tool
+
 
 class ChatHandlers:
     def __init__(self):
         self.llm = BedrockLLM()
-        self.tools = LLMTools()
 
     @staticmethod
     async def handle_start_chat(
@@ -35,7 +33,6 @@ class ChatHandlers:
             # Get user profile for context
             await membership_service.initialize()
             profile = await membership_service.get_member_profile(user_id)
-            # 由于是demo 不需要添加过多的异常处理
             
             # Create context for LLM
             context = {
@@ -52,20 +49,28 @@ class ChatHandlers:
                     "is_new_session": True
                 }
             }
+
+            prompt_template=f"The current conversation is in the {BookingStage.INITIAL_ENGAGEMENT.value} stage, Please refer to the INTERACTION GUIDELINES when engaging with user."
             
             # Generate greeting using Bedrock Claude
             with open("app/llm/prompts/travel_buddy_prompt.txt", "r") as f:
-                prompt = f.read()
+                system_prompt = f.read()
             
             # Create instance of BedrockLLM for static method
             llm = BedrockLLM()
-            # Use generate instead of stream_generate for greeting
-            greeting = await llm.generate(
-                prompt=prompt,
+            
+            # Use converse API for greeting - no tools needed for initial greeting
+            response = await llm.generate(
+                prompt_temp=prompt_template,
+                system_prompt=system_prompt,
                 context=context,
                 temperature=0.7,
-                max_tokens=200  # Shorter response for greeting
+                max_tokens=200,  # Shorter response for greeting
+                # No tools needed for greeting
             )
+            
+            # Extract greeting text from response
+            greeting = response if isinstance(response, str) else response.get("response", "")
             
             history = [{"role": "assistant", "content": greeting}]
 
@@ -93,11 +98,12 @@ class ChatHandlers:
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
             session = await session_service.get_or_create_session(user_id)
-            stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
-            return "", history, points_display, profile_display, stage_name, stage_number
+            stage = session.current_stage
+            return "", history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
         try:
             session = await session_service.get_or_create_session(user_id)
+            
             result = await session_service.process_message(
                 session=session,
                 user_id=user_id,
@@ -105,18 +111,23 @@ class ChatHandlers:
                 service=service
             )
 
-            # Extract flight info if in info collection stage
-            if session.current_stage == BookingStage.INFO_COLLECTION:
-                flight_info = ChatHandlers._extract_flight_info(message)
-                if flight_info:
-                    session.flight_info = flight_info
+            # Handle tool use results if present
+            if isinstance(result, dict) and "tool_results" in result:
+                for tool_result in result["tool_results"]:
+                    if tool_result.get("status") == "success":
+                        # Update session state based on tool results
+                        if "flight_info" in tool_result.get("data", {}):
+                            session.flight_info = tool_result["data"]["flight_info"]
+                        elif "booking" in tool_result.get("data", {}):
+                            session.booking_info = tool_result["data"]["booking"]
 
             # Update stage based on conversation progress
             new_stage = ChatHandlers._determine_stage(message, result["response"], session)
             if new_stage != session.current_stage:
                 stage_name, stage_number = session.update_stage(new_stage)
             else:
-                stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
+                stage = session.current_stage
+                stage_name, stage_number = stage.value, BookingStage.get_stage_number(stage)
 
             history.extend([
                 {"role": "user", "content": message},
@@ -140,32 +151,34 @@ class ChatHandlers:
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
             session = await session_service.get_or_create_session(user_id)
-            stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
-            return "", history, points_display, profile_display, stage_name, stage_number
+            stage = session.current_stage
+            return "", history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
     @staticmethod
     async def handle_upload(
-        file: Path,
+        file_path: str,  # Gradio UploadButton returns a file path as string
         history: List[dict],
         user_id: str,
         service: str
     ) -> Tuple[List[dict], str, str, str, int]:
         """Handle uploaded flight documents"""
         try:
-            with open(file.name, "rb") as f:
-                image_bytes = f.read()
-            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-
             session = await session_service.get_or_create_session(user_id)
             
-            # Process the upload through session service
+            # Process the upload through session service using the file path directly
             result = await session_service.process_message(
                 session=session,
                 user_id=user_id,
                 message="[Uploaded flight ticket image]",
                 service=service,
-                image=image_base64
+                image_path=file_path  # Use the file path directly
             )
+
+            # Handle tool use results
+            if isinstance(result, dict) and "tool_results" in result:
+                for tool_result in result["tool_results"]:
+                    if tool_result.get("status") == "success" and "flight_info" in tool_result.get("data", {}):
+                        session.flight_info = tool_result["data"]["flight_info"]
 
             history.extend([
                 {"role": "user", "content": "[Uploaded flight ticket image]"},
@@ -187,7 +200,8 @@ class ChatHandlers:
             if session.flight_info:
                 stage_name, stage_number = session.update_stage(BookingStage.LOUNGE_RECOMMENDATION)
             else:
-                stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
+                stage = session.current_stage
+                stage_name, stage_number = stage.value, BookingStage.get_stage_number(stage)
 
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
@@ -197,14 +211,14 @@ class ChatHandlers:
             app_logger.error(f"Error handling file upload: {str(e)}")
             error_msg = "I apologize, but I couldn't process your uploaded file. Please ensure it's a valid image file and try again."
             history.extend([
-                {"role": "user", "content": f"[Upload failed: {file.name}]"},
+                {"role": "user", "content": f"[Upload failed: {file_path}]"},
                 {"role": "assistant", "content": error_msg}
             ])
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
             session = await session_service.get_or_create_session(user_id)
-            stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
-            return history, points_display, profile_display, stage_name, stage_number
+            stage = session.current_stage
+            return history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
     @staticmethod
     async def handle_clear_chat(user_id: str) -> Tuple[List[dict], str, str, str, int]:
@@ -213,8 +227,8 @@ class ChatHandlers:
         session = await session_service.get_or_create_session(user_id)
         points_display = await data_service.get_points_display(user_id)
         profile_display = await data_service.get_profile_display(user_id)
-        stage_name, stage_number = session.current_stage.value, BookingStage.get_stage_number(session.current_stage)
-        return [], points_display, profile_display, stage_name, stage_number
+        stage = session.current_stage
+        return [], points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
     @staticmethod
     async def handle_refresh_info(user_id: str) -> Tuple[str, str]:
@@ -224,29 +238,17 @@ class ChatHandlers:
         return points_display, profile_display
 
     @staticmethod
-    def _extract_flight_info(message: str) -> dict:
-        """Extract flight information from user message"""
-        flight_info = {}
-        
-        # Extract flight number (e.g., CZ123, BA456)
-        flight_match = re.search(r'([A-Z]{2}\d{3,4})', message.upper())
-        if flight_match:
-            flight_info['flight_number'] = flight_match.group(1)
-        
-        # Extract arrival time
-        time_patterns = [
-            r'(\d{1,2}(?::\d{2})?\s*(?:am|pm))',  # 12-hour format
-            r'(\d{2}:\d{2})',  # 24-hour format
-            r'at\s+(\d{1,2}(?::\d{2})?)'  # Time with 'at' prefix
-        ]
-        
-        for pattern in time_patterns:
-            time_match = re.search(pattern, message.lower())
-            if time_match:
-                flight_info['arrival_time'] = time_match.group(1)
-                break
-        
-        return flight_info if flight_info else None
+    def _get_tools_for_stage(stage: BookingStage) -> List[str]:
+        """Get available tools based on the current booking stage"""
+        if stage == BookingStage.INFO_COLLECTION:
+            return ['extract_flight_info']
+        elif stage in [BookingStage.LOUNGE_RECOMMENDATION, BookingStage.CONFIRMATION]:
+            return ['get_available_lounges']
+        elif stage == BookingStage.BOOKING_EXECUTION:
+            return ['book_lounge']
+        elif stage == BookingStage.POST_BOOKING:
+            return ['check_membership_points']
+        return []
 
     @staticmethod
     def _determine_stage(user_message: str, assistant_response: str, session) -> BookingStage:
@@ -284,5 +286,5 @@ class ChatHandlers:
             return BookingStage.POST_BOOKING
             
         return current_stage
-
+    
 chat_handlers = ChatHandlers()

@@ -16,6 +16,7 @@ class LoungeLocation:
 
 @dataclass
 class LoungeInfo:
+    id: str  # Added id field
     name: str
     openingHours: str
     location: LoungeLocation
@@ -40,13 +41,17 @@ class LoungeService:
 
     def initialize(self) -> None:
         """Initialize the lounge service by loading data from JSON file"""
-        if not self._initialized:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(current_dir, 'airport_lounges.json')
-            
-            with open(json_path, 'r') as f:
-                self._data = json.load(f)
-            self._initialized = True
+        try:
+            if not self._initialized:
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                json_path = os.path.join(current_dir, 'airport_lounges.json')
+                
+                with open(json_path, 'r') as f:
+                    self._data = json.load(f)
+                self._initialized = True
+        except Exception as e:
+            print(f"Failed to initialize lounge service: {str(e)}")
+            self._initialized = False
 
     def _ensure_initialized(self) -> None:
         """Ensure the service is initialized before use"""
@@ -61,7 +66,7 @@ class LoungeService:
         for city_data in self._data.values():
             for airport in city_data.get('airport', []):
                 for lounge in airport['lounge']:
-                    if lounge['name'] == lounge_id:
+                    if lounge['id'] == lounge_id:  # Use id instead of name
                         return lounge.get('pointSpent', 1)  # Default to 1 if not specified
         return None
 
@@ -109,11 +114,16 @@ class LoungeService:
                                  for req in amenities):
                             continue
                     
+                    # Skip if lounge is temporarily unavailable
+                    if lounge_data.get('status') == 'Temporarily Unavailable':
+                        continue
+                    
                     # Convert location dict to LoungeLocation object
                     location = LoungeLocation(**lounge_data['location'])
                     
                     # Create LoungeInfo object
                     lounge = LoungeInfo(
+                        id=lounge_data['id'],  # Include id in the result
                         name=lounge_data['name'],
                         openingHours=lounge_data['openingHours'],
                         location=location,
@@ -151,12 +161,14 @@ class LoungeService:
         # Get points required for this lounge
         points_required = self._get_lounge_points(lounge_id)
         if points_required is None:
-            raise ValueError(f"Lounge not found: {lounge_id}")
+            print(f"Lounge not found: {lounge_id}")
+            return None
 
         # Check and deduct points from membership
         member_points = await membership_service.get_member_points(user_id)
-        if not member_points or member_points.points < points_required:
-            return None  # Insufficient points
+        if not member_points or member_points < points_required:
+            print(f"Insufficient points for user {user_id}: has {member_points}, needs {points_required}")
+            return None
 
         # Deduct points from membership
         await membership_service.update_points(user_id, -points_required)
@@ -176,27 +188,33 @@ class LoungeService:
             points_used=points_required
         )
         
-        # Convert to DynamoDB item
-        item = {
-            'booking_id': booking.booking_id,
-            'user_id': booking.user_id,
-            'lounge_id': booking.lounge_id,
-            'flight_number': booking.flight_number,
-            'booking_date': booking.booking_date.isoformat(),
-            'arrival_time': booking.arrival_time.isoformat(),
-            'status': booking.status.value,
-            'points_used': booking.points_used,
-            'created_at': booking.created_at.isoformat(),
-            'updated_at': booking.updated_at.isoformat()
-        }
-        
-        # Save to DynamoDB
-        self._table.put_item(Item=item)
-        
-        # Send SMS notification
-        self._send_booking_confirmation_sms(phone_number, booking)
-        
-        return booking
+        try:
+            # Convert to DynamoDB item
+            item = {
+                'booking_id': booking.booking_id,
+                'user_id': booking.user_id,
+                'lounge_id': booking.lounge_id,
+                'flight_number': booking.flight_number,
+                'booking_date': booking.booking_date.isoformat(),
+                'arrival_time': booking.arrival_time.isoformat(),
+                'status': booking.status.value,
+                'points_used': booking.points_used,
+                'created_at': booking.created_at.isoformat(),
+                'updated_at': booking.updated_at.isoformat()
+            }
+            
+            # Save to DynamoDB
+            self._table.put_item(Item=item)
+            
+            # Send SMS notification
+            self._send_booking_confirmation_sms(phone_number, booking)
+            
+            return booking
+        except Exception as e:
+            print(f"Failed to create booking: {str(e)}")
+            # Refund points if booking fails
+            await membership_service.update_points(user_id, points_required)
+            return None
 
     def _send_booking_confirmation_sms(self, phone_number: str, booking: LoungeBooking):
         """Send SMS notification for booking confirmation"""

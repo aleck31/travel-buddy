@@ -48,6 +48,7 @@ class ChatSession(BaseModel):
     metadata: Optional[dict] = None
     current_stage: BookingStage = Field(default=BookingStage.INITIAL_ENGAGEMENT)
     flight_info: Optional[Dict[str, Any]] = Field(default=None)
+    booking_info: Optional[Dict[str, Any]] = Field(default=None)
 
     def model_dump(self) -> dict:
         return {
@@ -58,7 +59,8 @@ class ChatSession(BaseModel):
             "updated_at": self.updated_at,
             "metadata": self.metadata,
             "current_stage": self.current_stage,
-            "flight_info": self.flight_info
+            "flight_info": self.flight_info,
+            "booking_info": self.booking_info
         }
 
     @classmethod
@@ -77,7 +79,8 @@ class ChatSession(BaseModel):
             updated_at=data.get("updated_at", datetime.now().isoformat()),
             metadata=data.get("metadata"),
             current_stage=BookingStage(data.get("current_stage", BookingStage.INITIAL_ENGAGEMENT)),
-            flight_info=data.get("flight_info")
+            flight_info=data.get("flight_info"),
+            booking_info=data.get("booking_info")
         )
 
     def update_stage(self, new_stage: BookingStage) -> tuple[str, int]:

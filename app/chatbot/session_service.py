@@ -1,6 +1,6 @@
 from datetime import datetime
 import uuid
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from ..models.chat import ChatSession, ChatMessage, MessageRole
 from ..llm.integrations.bedrock_chat import BedrockChatIntegration
@@ -66,22 +66,30 @@ class SessionService:
         }
         await data_service.save_messages(item)
 
-    async def process_message(self, session: ChatSession, user_id: str, message: str, service: str, image: Optional[str] = None):
+    async def process_message(
+        self,
+        session: ChatSession,
+        user_id: str,
+        message: str,
+        service: str,
+        image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Process a chat message through the chat integration"""
         # Prepare session state for context
         session_state = {
-            "current_stage": session.current_stage,
+            "current_stage": session.current_stage.value,  # Pass stage as string value
             "flight_info": session.flight_info,
             "messages": [msg.model_dump() for msg in session.messages],
-            "metadata": session.metadata
+            "metadata": session.metadata,
+            "booking_info": getattr(session, 'booking_info', None)  # Include booking info if available
         }
 
         result = await self.chat_integration.process_message(
             session_id=session.session_id,
             user_id=user_id,
             message=message,
-            service_type=service,
-            image=image,
+            service_type=service,  # Default to Lounge as it's the only implemented service
+            image_path=image_path,
             session_state=session_state
         )
 
@@ -93,6 +101,8 @@ class SessionService:
                 session.flight_info = result["state"]["flight_info"]
             if "metadata" in result["state"]:
                 session.metadata = result["state"]["metadata"]
+            if "booking_info" in result["state"]:
+                session.booking_info = result["state"]["booking_info"]
 
         return result
 

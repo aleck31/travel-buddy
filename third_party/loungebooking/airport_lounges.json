@@ -6,6 +6,7 @@
                 "code": "PVG",
                 "lounge": [
                     {
+                        "id": "pvg_t1_fl09",
                         "name": "First Class Lounge No.9",
                         "openingHours": "06:00 - Last Flight daily",
                         "location": {
@@ -28,6 +29,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "pvg_t1_fl39",
                         "name": "First Class Lounge No.39",
                         "openingHours": "06:00 - 22:00",
                         "location": {
@@ -51,6 +53,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "pvg_t2_vip69",
                         "name": "VIP Lounge No.69",
                         "openingHours": "06:00 - 23:00",
                         "location": {
@@ -73,6 +76,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "pvg_t2_fl73",
                         "name": "First Class Lounge No.73",
                         "openingHours": "06:00 - Last Flight",
                         "location": {
@@ -96,6 +100,7 @@
                         "pointSpent": 3
                     },
                     {
+                        "id": "pvg_s2_vip190",
                         "name": "VIP Lounge No.190",
                         "openingHours": "First Flight - Last Flight",
                         "location": {
@@ -113,6 +118,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "pvg_t1_vip135",
                         "name": "VIP Lounge No.135",
                         "openingHours": "06:00-23:00",
                         "location": {
@@ -137,6 +143,7 @@
                 "code": "SHA",
                 "lounge": [
                     {
+                        "id": "sha_t2_v01",
                         "name": "First Class Lounge V1",
                         "openingHours": "05:30-Last Flight",
                         "location": {
@@ -148,6 +155,7 @@
                         "pointSpent": 1
                     },
                     {
+                        "id": "sha_t1_v03",
                         "name": "V03 VIP Lounge",
                         "openingHours": "06:30 - 20:00 daily",
                         "location": {
@@ -159,6 +167,7 @@
                         "pointSpent": 1
                     },
                     {
+                        "id": "sha_t2_v26",
                         "name": "China Southern Airlines VIP Lounge V26",
                         "openingHours": "06:20 - Last Flight",
                         "location": {
@@ -181,6 +190,7 @@
                         "pointSpent": 3
                     },
                     {
+                        "id": "sha_t1_v01",
                         "name": "V01 China Eastern Lounge",
                         "status": "Temporarily Unavailable",
                         "openingHours": "06:00 - Last Flight daily",
@@ -218,6 +228,7 @@
                 "code": "SZX",
                 "lounge": [
                     {
+                        "id": "szx_t3_joyee",
                         "name": "JOYEE International Business Class Lounge",
                         "openingHours": "24 hours daily",
                         "location": {
@@ -237,6 +248,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "szx_sat_cz",
                         "name": "China Southern Sky Pearl Club VIP",
                         "openingHours": "6:30-China Southern Airlines flight ends at the latest",
                         "location": {
@@ -258,6 +270,7 @@
                         "pointSpent": 3
                     },
                     {
+                        "id": "szx_t3_c24",
                         "name": "C24 Business VIP Lounge (Dom T3)",
                         "openingHours": "06:00-22:00",
                         "location": {
@@ -274,6 +287,7 @@
                         "pointSpent": 1
                     },
                     {
+                        "id": "szx_t3_dom",
                         "name": "VIP Service - Shenzhen Airport Domestic Guest Lounge",
                         "openingHours": "06:00-22:00",
                         "location": {
@@ -298,6 +312,7 @@
                         "pointSpent": 3
                     },
                     {
+                        "id": "szx_t3_dom3",
                         "name": "Shenzhen Airport Domestic VIP lounge 3(T3 - Intl)",
                         "openingHours": "07:00-22:00",
                         "location": {
@@ -320,6 +335,7 @@
                         "pointSpent": 3
                     },
                     {
+                        "id": "szx_t3_intl",
                         "name": "International Business VIP Lounge",
                         "openingHours": "07:00-22:00",
                         "location": {
@@ -340,6 +356,7 @@
                         "pointSpent": 2
                     },
                     {
+                        "id": "szx_t3_dom2",
                         "name": "VIP Service - Shenzhen Airport Domestic VIP Lounge 2",
                         "openingHours": "07:00-22:00",
                         "location": {

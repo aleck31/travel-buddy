@@ -1,6 +1,6 @@
 import json
 import boto3
-from typing import List, Dict, Any, Optional, Generator
+from typing import List, Dict, Any, Optional
 from ..core import settings, app_logger
 from .tools import Tool, ToolResult
 
@@ -10,107 +10,54 @@ class BedrockLLM:
     def __init__(self):
         self.client = BedrockClient()
 
-    # Note: generate() will be deprecated, it's recommended to use stream_generate() method with higher priority
     async def generate(
-        self,
-        prompt: str,
+        self,        
+        system_prompt: str,
+        prompt_temp: str,
         context: Dict[str, Any],
         temperature: float = 0.7,
-        max_tokens: int = 2048
+        max_tokens: int = 2048,
+        tools: Optional[List[Tool]] = None,
+        use_rag: Optional[bool] = False
     ) -> str:
         """
         Generate a response using the Bedrock LLM
         
         Args:
-            prompt: The prompt template to use
+            prompt_temp: The prompt template to use
             context: Context information to inform the response
             temperature: Controls randomness in generation
             max_tokens: Maximum tokens to generate
+            tools: Optional list of tools available to the model
+            system_prompt: Optional system prompt to guide the model's behavior
             
         Returns:
             Generated response string
         """
-        # Format messages for the model
-        messages = [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": f"{prompt}\n\nContext: {json.dumps(context)}"}]
-            }
-        ]
-        
         try:
-            response = self.client.generate_response(
-                messages=messages,
+            response = await self.client.generate_response(
+                system_prompt=system_prompt,
+                prompt_temp=prompt_temp,
+                context=context,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                tools=tools,
+                use_rag=use_rag
             )
             return response
         except Exception as e:
             app_logger.error(f"Error generating LLM response: {str(e)}")
             raise
 
-    def stream_generate(
-        self,
-        prompt: str,
-        context: Dict[str, Any],
-        temperature: float = 0.7,
-        max_tokens: int = 2048
-    ) -> Generator[str, None, None]:
-        """
-        Generate a streaming response using the Bedrock LLM
-        
-        Args:
-            prompt: The prompt template to use
-            context: Context information to inform the response
-            temperature: Controls randomness in generation
-            max_tokens: Maximum tokens to generate
-            
-        Yields:
-            Generated response chunks as they become available
-        """
-        messages = [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": f"{prompt}\n\nContext: {json.dumps(context)}"}]
-            }
-        ]
-        
-        try:
-            # Prepare request body
-            body = self.client._prepare_request_body(
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-
-            # Start streaming conversation
-            stream = self.client.runtime_client.invoke_model_with_response_stream(
-                modelId=self.client.model_id,
-                body=json.dumps(body)
-            )
-
-            # Process streaming response
-            for event in stream['body']:
-                if 'chunk' in event:
-                    chunk_data = json.loads(event['chunk']['bytes'].decode())
-                    if 'content' in chunk_data and len(chunk_data['content']) > 0:
-                        yield chunk_data['content'][0]['text']
-
-        except Exception as e:
-            app_logger.error(f"Error generating streaming LLM response: {str(e)}")
-            raise
-
 
 class BedrockClient:
     """Low-level client for AWS Bedrock API interactions"""
     def __init__(self):
-        # Initialize Bedrock runtime client for model invocation
         self.runtime_client = boto3.client(
             'bedrock-runtime',
             region_name=settings.BEDROCK_REGION
         )
         
-        # Initialize Bedrock agent runtime client for RAG operations
         self.agent_runtime_client = boto3.client(
             'bedrock-agent-runtime',
             region_name=settings.BEDROCK_REGION
@@ -119,48 +66,84 @@ class BedrockClient:
         self.model_id = settings.BEDROCK_MODEL_ID
         self.knowledge_base_id = settings.KNOWLEDGE_BASE_ID
 
-    def generate_response(
+    async def generate_response(
         self,
-        messages: List[Dict[str, Any]],
+        system_prompt: str,
+        prompt_temp: str,
+        context: Dict[str, Any],
         temperature: float = 0.7,
         max_tokens: int = 2048,
         tools: Optional[List[Tool]] = None,
-        image_base64: Optional[str] = None,
-        use_rag: bool = True
+        use_rag: Optional[bool] = False,
+        max_recursions: int = 5
     ) -> str:
-        """
-        Generate a response using Claude via AWS Bedrock with optional RAG support
-        """
+        """Generate a response using Claude via AWS Bedrock with optional tool use"""
         try:
+            # Format the initial message with proper structure
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "text": f"{prompt_temp}\n\nContext: {json.dumps(context)}"
+                        }
+                    ]
+                }
+            ]
+
             # Try RAG if enabled
             if use_rag and self.knowledge_base_id:
-                rag_response = self._try_rag_response(messages)
+                rag_response = await self._try_rag_response(messages)
                 if rag_response:
                     return rag_response
 
-            # Prepare request body
-            body = self._prepare_request_body(
+            # Prepare request parameters
+            request_params = {
+                "modelId": self.model_id,
+                "messages": messages,
+                "inferenceConfig": {
+                    "maxTokens": max_tokens,
+                    "temperature": temperature,
+                    "stopSequences": []
+                }
+            }
+
+            # Add system if provided
+            if system_prompt:
+                request_params["system"] = [{"text": system_prompt}]
+
+            # Add tool configuration only if tools are provided
+            if tools:
+                request_params["toolConfig"] = {
+                    "tools": [
+                        {
+                            "toolSpec": self._convert_tool_to_spec(tool)
+                        } for tool in tools
+                    ],
+                    "toolChoice": {
+                        "auto": {}
+                    }
+                }
+
+            # Start conversation with Bedrock
+            response = self.runtime_client.converse(**request_params)
+            
+            # Process the response recursively if needed
+            return await self._process_response(
+                response=response,
                 messages=messages,
+                tool_config=request_params.get("toolConfig"),
+                system=request_params.get("system"),
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools,
-                image_base64=image_base64
+                max_recursions=max_recursions
             )
-
-            # Invoke the model
-            response = self.runtime_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(body)
-            )
-
-            # Parse and return the response
-            return self._parse_response(response)
 
         except Exception as e:
             app_logger.error(f"Error generating response from Bedrock: {str(e)}")
             raise
 
-    def _try_rag_response(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+    async def _try_rag_response(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """Try to get a response using RAG if possible"""
         try:
             # Get the last user message for RAG query
@@ -198,56 +181,165 @@ class BedrockClient:
             app_logger.error(f"Error retrieving from knowledge base: {str(e)}")
             
         return None
-
-    def _prepare_request_body(
+    
+    def _send_to_bedrock(
         self,
         messages: List[Dict[str, Any]],
-        temperature: float,
-        max_tokens: int,
-        tools: Optional[List[Tool]] = None,
-        image_base64: Optional[str] = None
+        tool_config: Optional[Dict[str, Any]] = None,
+        system: Optional[List[Dict[str, str]]] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2048
     ) -> Dict[str, Any]:
-        """Prepare the request body for model invocation"""
-        body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": messages
+        """Send conversation to Bedrock"""
+        request_params = {
+            "modelId": self.model_id,
+            "messages": messages,
+            "inferenceConfig": {
+                "maxTokens": max_tokens,
+                "temperature": temperature,
+                "stopSequences": []
+            }
         }
 
-        # Add image if provided
-        if image_base64 and body["messages"]:
-            self._add_image_to_message(body["messages"][-1], image_base64)
+        if system:
+            request_params["system"] = system
 
-        # Add tools if provided
-        if tools:
-            body["tools"] = [tool.model_dump() for tool in tools]
+        if tool_config:
+            request_params["toolConfig"] = tool_config
 
-        return body
+        return self.runtime_client.converse(**request_params)
 
-    def _add_image_to_message(self, message: Dict[str, Any], image_base64: str) -> None:
-        """Add image content to a message"""
-        if message["role"] == "user":
-            message["content"].insert(0, {
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": "image/jpeg",
-                    "data": image_base64
-                }
-            })
+    async def _process_response(
+        self,
+        response: Dict[str, Any],
+        messages: List[Dict[str, Any]],
+        tool_config: Optional[Dict[str, Any]],
+        system: Optional[List[Dict[str, str]]],
+        temperature: float,
+        max_tokens: int,
+        max_recursions: int
+    ) -> str:
+        """Process Bedrock response and handle tool use recursively"""
+        if max_recursions <= 0:
+            raise Exception("Maximum number of tool use recursions reached")
 
-    def _parse_response(self, response: Any) -> str:
-        """Parse the response from Bedrock"""
-        response_body = json.loads(response['body'].read())
+        # Extract response content from converse API format
+        output = response.get("output", {})
+        message = output.get("message", {})
+        message_content = message.get("content", [])
         
-        if 'content' in response_body and len(response_body['content']) > 0:
-            return response_body['content'][0]['text']
-        elif 'messages' in response_body and len(response_body['messages']) > 0:
-            return response_body['messages'][-1]['content'][0]['text']
-        else:
-            app_logger.error(f"Unexpected response format: {response_body}")
-            raise ValueError("Unexpected response format from Bedrock")
+        # Add model's response to conversation
+        messages.append({
+            "role": "assistant",
+            "content": message_content
+        })
+
+        # Process each content item
+        response_text = ""
+        tool_uses = []
+
+        for content in message_content:
+            if "text" in content:
+                response_text += content["text"]
+            elif "toolUse" in content:
+                tool_uses.append(content["toolUse"])
+
+        if tool_uses:
+            # Handle tool uses
+            tool_results = []
+            
+            for tool_use in tool_uses:
+                result = await self._execute_tool(tool_use)
+                
+                tool_results.append({
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": tool_use["toolUseId"],
+                                "content": [
+                                    {
+                                        "json": result.data if isinstance(result, ToolResult) and result.success else result
+                                    } if not isinstance(result, dict) or "error" not in result else {
+                                        "text": result["error"]
+                                    }
+                                ],
+                                "status": "success" if (isinstance(result, ToolResult) and result.success) or (isinstance(result, dict) and "error" not in result) else "error"
+                            }
+                        }
+                    ]
+                })
+
+            # Add tool results to conversation
+            messages.extend(tool_results)
+
+            # Continue conversation with tool results
+            next_response = self._send_to_bedrock(
+                messages=messages,
+                tool_config=tool_config,
+                system=system,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            return await self._process_response(
+                response=next_response,
+                messages=messages,
+                tool_config=tool_config,
+                system=system,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                max_recursions=max_recursions - 1
+            )
+
+        # Return final response text if no tool uses
+        return response_text
+
+    async def _execute_tool(self, tool_use: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the requested tool and return results"""
+        try:
+            tool_name = tool_use["name"]
+            tool_input = tool_use["input"]
+            
+            # Get the tool function from the registered tools
+            from app.llm.tools.lounge import get_available_lounges, book_lounge
+            from app.llm.tools.flight import FlightTools
+            from app.llm.tools.membership import check_membership_points
+            
+            tools = {
+                "get_available_lounges": get_available_lounges,
+                "book_lounge": book_lounge,
+                "extract_flight_info": FlightTools().extract_flight_info,
+                "check_membership_points": check_membership_points
+            }
+            
+            if tool_name not in tools:
+                raise ValueError(f"Unknown tool: {tool_name}")
+            
+            # Execute the tool
+            result = await tools[tool_name](**tool_input)
+            
+            if isinstance(result, ToolResult):
+                if result.success:
+                    return result.data
+                else:
+                    return {"error": result.error}
+            else:
+                return result
+                
+        except Exception as e:
+            app_logger.error(f"Error executing tool {tool_name}: {str(e)}")
+            return {"error": str(e)}
+
+    def _convert_tool_to_spec(self, tool: Tool) -> Dict[str, Any]:
+        """Convert tool to Bedrock tool specification format"""
+        return {
+            "name": tool.name,
+            "description": tool.description,
+            "inputSchema": {
+                "json": tool.parameters
+            }
+        }
 
 
 # Create a singleton instance

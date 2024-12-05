@@ -60,6 +60,9 @@ class Lounge(BaseModel):
     description: str
     metadata: Optional[dict] = None
 
+    class Config:
+        from_attributes = True
+
 
 class LoungeBooking(BaseModel):
     booking_id: str
@@ -74,3 +77,6 @@ class LoungeBooking(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     metadata: Optional[dict] = None
+
+    class Config:
+        from_attributes = True
