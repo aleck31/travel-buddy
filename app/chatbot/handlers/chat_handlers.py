@@ -46,6 +46,7 @@ class ChatHandlers:
                 },
                 "session_state": {
                     "current_stage": BookingStage.INITIAL_ENGAGEMENT.value,
+                    "stage_data": session.stage_data.model_dump(),
                     "is_new_session": True
                 }
             }
@@ -104,6 +105,7 @@ class ChatHandlers:
         try:
             session = await session_service.get_or_create_session(user_id)
             
+            # Process message and get response
             result = await session_service.process_message(
                 session=session,
                 user_id=user_id,
@@ -111,38 +113,25 @@ class ChatHandlers:
                 service=service
             )
 
-            # Handle tool use results if present
-            if isinstance(result, dict) and "tool_results" in result:
-                for tool_result in result["tool_results"]:
-                    if tool_result.get("status") == "success":
-                        # Update session state based on tool results
-                        if "flight_info" in tool_result.get("data", {}):
-                            session.flight_info = tool_result["data"]["flight_info"]
-                        elif "booking" in tool_result.get("data", {}):
-                            session.booking_info = tool_result["data"]["booking"]
-
-            # Update stage based on conversation progress
-            new_stage = ChatHandlers._determine_stage(message, result["response"], session)
-            if new_stage != session.current_stage:
-                stage_name, stage_number = session.update_stage(new_stage)
-            else:
-                stage = session.current_stage
-                stage_name, stage_number = stage.value, BookingStage.get_stage_number(stage)
-
+            # Update chat history
             history.extend([
                 {"role": "user", "content": message},
                 {"role": "assistant", "content": result["response"]}
             ])
             
+            # Save messages to session
             user_message = ChatMessage(role=MessageRole.USER, content=message)
             assistant_message = ChatMessage(role=MessageRole.ASSISTANT, content=result["response"])
             session.messages.extend([user_message, assistant_message])
             await session_service.save_messages(session, [user_message, assistant_message])
             
+            # Get updated displays
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
             
-            return "", history, points_display, profile_display, stage_name, stage_number
+            # Return current stage info
+            stage = session.current_stage
+            return "", history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
         except Exception as e:
             app_logger.error(f"Error handling message: {str(e)}")
@@ -169,25 +158,22 @@ class ChatHandlers:
             result = await session_service.process_message(
                 session=session,
                 user_id=user_id,
-                message="[Uploaded flight ticket image]",
+                message=file_path,
                 service=service,
                 image_path=file_path  # Use the file path directly
             )
 
-            # Handle tool use results
-            if isinstance(result, dict) and "tool_results" in result:
-                for tool_result in result["tool_results"]:
-                    if tool_result.get("status") == "success" and "flight_info" in tool_result.get("data", {}):
-                        session.flight_info = tool_result["data"]["flight_info"]
-
+            # Update chat history
             history.extend([
-                {"role": "user", "content": "[Uploaded flight ticket image]"},
+                {"role": "user", "content": (file_path,)},  # Tuple format for image display
                 {"role": "assistant", "content": result["response"]}
             ])
 
+            # Save messages to session
             user_message = ChatMessage(
                 role=MessageRole.USER,
-                content="[Uploaded flight ticket image]"
+                # Mark real file path
+                content="[Uploaded a boarding pass or flight ticket picture]"
             )
             assistant_message = ChatMessage(
                 role=MessageRole.ASSISTANT,
@@ -196,16 +182,13 @@ class ChatHandlers:
             session.messages.extend([user_message, assistant_message])
             await session_service.save_messages(session, [user_message, assistant_message])
 
-            # Move to recommendation stage if we have flight info
-            if session.flight_info:
-                stage_name, stage_number = session.update_stage(BookingStage.LOUNGE_RECOMMENDATION)
-            else:
-                stage = session.current_stage
-                stage_name, stage_number = stage.value, BookingStage.get_stage_number(stage)
-
+            # Get updated displays
             points_display = await data_service.get_points_display(user_id)
             profile_display = await data_service.get_profile_display(user_id)
-            return history, points_display, profile_display, stage_name, stage_number
+            
+            # Return current stage info
+            stage = session.current_stage
+            return history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
         except Exception as e:
             app_logger.error(f"Error handling file upload: {str(e)}")
@@ -237,54 +220,4 @@ class ChatHandlers:
         profile_display = await data_service.get_profile_display(user_id)
         return points_display, profile_display
 
-    @staticmethod
-    def _get_tools_for_stage(stage: BookingStage) -> List[str]:
-        """Get available tools based on the current booking stage"""
-        if stage == BookingStage.INFO_COLLECTION:
-            return ['extract_flight_info']
-        elif stage in [BookingStage.LOUNGE_RECOMMENDATION, BookingStage.CONFIRMATION]:
-            return ['get_available_lounges']
-        elif stage == BookingStage.BOOKING_EXECUTION:
-            return ['book_lounge']
-        elif stage == BookingStage.POST_BOOKING:
-            return ['check_membership_points']
-        return []
-
-    @staticmethod
-    def _determine_stage(user_message: str, assistant_response: str, session) -> BookingStage:
-        """Determine the current booking stage based on conversation context"""
-        current_stage = session.current_stage
-        
-        # Initial engagement to info collection
-        if current_stage == BookingStage.INITIAL_ENGAGEMENT and any(
-            keyword in user_message.lower() for keyword in ["book", "lounge", "yes", "help"]
-        ):
-            return BookingStage.INFO_COLLECTION
-            
-        # Info collection to lounge recommendation
-        if current_stage == BookingStage.INFO_COLLECTION:
-            if session.flight_info and session.flight_info.get('flight_number'):
-                return BookingStage.LOUNGE_RECOMMENDATION
-            
-        # Lounge recommendation to confirmation
-        if current_stage == BookingStage.LOUNGE_RECOMMENDATION and any(
-            keyword in user_message.lower() for keyword in ["select", "choose", "book", "yes", "confirm"]
-        ):
-            return BookingStage.CONFIRMATION
-            
-        # Confirmation to booking execution
-        if current_stage == BookingStage.CONFIRMATION and any(
-            keyword in user_message.lower() for keyword in ["proceed", "yes", "confirm", "book"]
-        ):
-            return BookingStage.BOOKING_EXECUTION
-            
-        # Booking execution to post-booking
-        if current_stage == BookingStage.BOOKING_EXECUTION and any(
-            keyword in assistant_response.lower() for keyword in 
-            ["booking confirmed", "successfully booked", "booking reference"]
-        ):
-            return BookingStage.POST_BOOKING
-            
-        return current_stage
-    
 chat_handlers = ChatHandlers()

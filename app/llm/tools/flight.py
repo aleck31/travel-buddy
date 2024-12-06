@@ -10,12 +10,13 @@ class FlightTools:
     def __init__(self):
         self.textract_client = boto3.client('textract')
 
-    async def extract_flight_info(self, image_path: str) -> ToolResult:
+    async def check_flight_document(self, image_path: str, user_profile: Dict[str, str]) -> ToolResult:
         """
-        Extract text information from a flight ticket image using AWS Textract
+        Extract text information from a flight ticket image and verify against user profile
         
         Args:
             image_path: Path to the uploaded image file
+            user_profile: Dictionary containing user profile information including first_name and last_name
         """
         try:
             # Read image file
@@ -40,25 +41,38 @@ class FlightTools:
             # Add raw text for debugging/verification
             flight_info['raw_text'] = extracted_text
             
-            # Validate extracted information
-            if not flight_info['flight_number']:
+            # Check required fields
+            required_fields = ['flight_number', 'date', 'passenger_name']
+            for field in required_fields:
+                if not flight_info[field]:
+                    return ToolResult(
+                        success=False,
+                        error=f"Could not find {field} in the image",
+                        data={"flight_info": flight_info}  # Include flight_info even on failure for debugging
+                    )
+
+            # Get full name from profile and verify
+            first_name = user_profile.get('first_name', '').strip()
+            last_name = user_profile.get('last_name', '').strip()
+            ticket_name = flight_info['passenger_name'].strip().upper()
+            
+            # Check exact match for either "first_name last_name" or "last_name first_name"
+            if ticket_name != f"{first_name} {last_name}".upper() and ticket_name != f"{last_name} {first_name}".upper():
+                app_logger.error(f"ticket name ({ticket_name}) does not match profile name ({first_name} {last_name})")
                 return ToolResult(
                     success=False,
-                    error="Could not find a valid flight number in the image"
+                    error=f"Passenger name on ticket ({ticket_name}) does not match user profile name ({first_name} {last_name})",
+                    data={"flight_info": flight_info}  # Include flight_info even on failure for debugging
                 )
             
-            if not flight_info['date']:
-                return ToolResult(
-                    success=False,
-                    error="Could not find a valid date in the image"
-                )
-            
+            # All validations passed
             return ToolResult(
                 success=True,
-                data=flight_info
+                data={"flight_info": flight_info}  # Properly structure data for state update
             )
             
         except FileNotFoundError:
+            app_logger.error(f"Image file not found: {image_path}")
             return ToolResult(
                 success=False,
                 error=f"Image file not found: {image_path}"
@@ -127,29 +141,52 @@ class FlightTools:
                 if seat_match and not fields['seat']:
                     fields['seat'] = seat_match.group(1)
             
-            # Look for passenger name
-            if ('PASSENGER' in line or 'NAME' in line) and not fields['passenger_name']:
-                name_parts = line.replace('PASSENGER', '').replace('NAME', '').strip().split()
-                if name_parts:
-                    fields['passenger_name'] = ' '.join(name_parts)
+            # Improved passenger name extraction
+            if not fields['passenger_name']:
+                # Check for common passenger name patterns
+                name_patterns = [
+                    r'NAME OF PASSENGER:?\s*([A-Z\s]+)(?:\s|$)',
+                    r'PASSENGER:?\s*([A-Z\s]+)(?:\s|$)',
+                    r'NAME:?\s*([A-Z\s]+)(?:\s|$)'
+                ]
+                
+                for pattern in name_patterns:
+                    name_match = re.search(pattern, line)
+                    if name_match:
+                        fields['passenger_name'] = name_match.group(1).strip()
+                        break
         
         return fields
 
 
 # Tool definitions using proper JSON schema format
-EXTRACT_FLIGHT_INFO_TOOL = Tool(
-    name="extract_flight_info",
-    description="Extracts flight information from a ticket image including flight number, passenger name, departure/arrival airports, date, and seat assignment. Uses OCR technology to process the image and identify key details.",
+check_flight_document_TOOL = Tool(
+    name="check_flight_document",
+    description="Extracts and verifies flight information from a ticket image including flight number, passenger name, departure/arrival airports, date, and seat assignment. Verifies the passenger name matches the user profile name.",
     parameters={
         "type": "object",
         "properties": {
             "image_path": {
                 "type": "string",
                 "description": "Path to the uploaded flight ticket image file"
+            },
+            "user_profile": {
+                "type": "object",
+                "description": "User profile information containing first_name and last_name for verification",
+                "properties": {
+                    "first_name": {
+                        "type": "string",
+                        "description": "User's first name in English"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "description": "User's last name in English"
+                    }
+                }
             }
         }
     },
-    required=["image_path"]
+    required=["image_path", "user_profile"]
 )
 
-FLIGHT_TOOLS = [EXTRACT_FLIGHT_INFO_TOOL]
+FLIGHT_TOOLS = [check_flight_document_TOOL]

@@ -53,7 +53,7 @@ class ChatInterface:
                             [],
                             elem_id="chatbot",
                             bubble_full_width=False,
-                            avatar_images=[str(Path(__file__).parent / "avata_buddy.jpg"), str(Path(__file__).parent / "avata_user.jpg")],
+                            avatar_images=[str(Path(__file__).parent / "avata_user.jpg"), str(Path(__file__).parent / "avata_buddy.jpg")],
                             height=600,
                             type="messages"
                         )

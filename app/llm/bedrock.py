@@ -239,10 +239,13 @@ class BedrockClient:
         tool_uses = []
 
         for content in message_content:
-            if "text" in content:
-                response_text += content["text"]
-            elif "toolUse" in content:
-                tool_uses.append(content["toolUse"])
+            if isinstance(content, dict):  # Ensure content is a dictionary
+                if "text" in content:
+                    response_text += content["text"]
+                elif "toolUse" in content:
+                    tool_use = content["toolUse"]
+                    if isinstance(tool_use, dict) and "name" in tool_use:  # Verify tool_use is a dict with name
+                        tool_uses.append(tool_use)
 
         if tool_uses:
             # Handle tool uses
@@ -256,7 +259,7 @@ class BedrockClient:
                     "content": [
                         {
                             "toolResult": {
-                                "toolUseId": tool_use["toolUseId"],
+                                "toolUseId": tool_use.get("toolUseId", ""),
                                 "content": [
                                     {
                                         "json": result.data if isinstance(result, ToolResult) and result.success else result
@@ -298,8 +301,11 @@ class BedrockClient:
     async def _execute_tool(self, tool_use: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the requested tool and return results"""
         try:
-            tool_name = tool_use["name"]
-            tool_input = tool_use["input"]
+            tool_name = tool_use.get("name")
+            if not tool_name:
+                raise ValueError("Tool name not provided")
+                
+            tool_input = tool_use.get("input", {})
             
             # Get the tool function from the registered tools
             from app.llm.tools.lounge import get_available_lounges, book_lounge
@@ -309,7 +315,7 @@ class BedrockClient:
             tools = {
                 "get_available_lounges": get_available_lounges,
                 "book_lounge": book_lounge,
-                "extract_flight_info": FlightTools().extract_flight_info,
+                "check_flight_document": FlightTools().check_flight_document,
                 "check_membership_points": check_membership_points
             }
             
@@ -328,7 +334,7 @@ class BedrockClient:
                 return result
                 
         except Exception as e:
-            app_logger.error(f"Error executing tool {tool_name}: {str(e)}")
+            app_logger.error(f"Error executing tool {tool_name if 'tool_name' in locals() else 'unknown'}: {str(e)}")
             return {"error": str(e)}
 
     def _convert_tool_to_spec(self, tool: Tool) -> Dict[str, Any]:

@@ -1,7 +1,7 @@
 from .base import Tool, ToolResult
 from .membership import check_membership_points, MEMBERSHIP_TOOLS
 from .flight import FlightTools, FLIGHT_TOOLS
-from .lounge import get_available_lounges, book_lounge, LOUNGE_TOOLS
+from .lounge import get_available_lounges, book_lounge, store_lounge_info, LOUNGE_TOOLS
 
 
 # Initialize FlightTools instance
@@ -30,9 +30,9 @@ class LLMTools:
         """Book a lounge for the user"""
         return await book_lounge(user_id, lounge_id, flight_number, arrival_time)
 
-    async def extract_flight_info(self, image_path: str) -> ToolResult:
+    async def check_flight_document(self, image_path: str) -> ToolResult:
         """Extract information from ticket image"""
-        return await self.flight_tools.extract_flight_info(image_path)
+        return await self.flight_tools.check_flight_document(image_path)
 
 
 # Export all tool functions and classes
@@ -42,6 +42,7 @@ __all__ = [
     'LLMTools',
     'check_membership_points',
     'get_available_lounges',
+    'store_lounge_info',
     'book_lounge',
     'flight_tools',
     'MEMBERSHIP_TOOLS',
