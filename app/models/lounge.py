@@ -80,3 +80,11 @@ class LoungeBooking(BaseModel):
 
     class Config:
         from_attributes = True
+
+    def model_dump(self, **kwargs):
+        data = super().model_dump(**kwargs)
+        # Convert datetime fields to ISO format strings
+        for field in ['booking_date', 'arrival_time', 'departure_time', 'created_at', 'updated_at']:
+            if data.get(field):
+                data[field] = data[field].isoformat()
+        return data

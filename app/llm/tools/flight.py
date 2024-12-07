@@ -1,5 +1,6 @@
 import boto3
 import re
+import json
 from datetime import datetime
 from typing import List, Dict
 from .base import Tool, ToolResult
@@ -19,6 +20,9 @@ class FlightTools:
             user_profile: Dictionary containing user profile information including first_name and last_name
         """
         try:
+            # app_logger.info(f"Processing flight document: {image_path}")
+            # app_logger.info(f"User profile: {json.dumps(user_profile)}")
+            
             # Read image file
             with open(image_path, 'rb') as image_file:
                 image_bytes = image_file.read()
@@ -45,6 +49,7 @@ class FlightTools:
             required_fields = ['flight_number', 'date', 'passenger_name']
             for field in required_fields:
                 if not flight_info[field]:
+                    app_logger.error(f"Missing required field: {field}")
                     return ToolResult(
                         success=False,
                         error=f"Could not find {field} in the image",
@@ -58,7 +63,7 @@ class FlightTools:
             
             # Check exact match for either "first_name last_name" or "last_name first_name"
             if ticket_name != f"{first_name} {last_name}".upper() and ticket_name != f"{last_name} {first_name}".upper():
-                app_logger.error(f"ticket name ({ticket_name}) does not match profile name ({first_name} {last_name})")
+                app_logger.error(f"Name mismatch - Ticket: {ticket_name}, Profile: {first_name} {last_name}")
                 return ToolResult(
                     success=False,
                     error=f"Passenger name on ticket ({ticket_name}) does not match user profile name ({first_name} {last_name})",
@@ -66,10 +71,20 @@ class FlightTools:
                 )
             
             # All validations passed
-            return ToolResult(
+            app_logger.info("Flight document validation successful")
+            app_logger.info(f"Returning flight info: {json.dumps(flight_info)}")
+            
+            # Create successful result with flight info
+            result = ToolResult(
                 success=True,
-                data={"flight_info": flight_info}  # Properly structure data for state update
+                data={"flight_info": flight_info}
             )
+            
+            # Log the state update that will be generated
+            state_update = result.get_state_update()
+            app_logger.info(f"Tool result state update: {json.dumps(state_update)}")
+            
+            return result
             
         except FileNotFoundError:
             app_logger.error(f"Image file not found: {image_path}")
@@ -156,11 +171,12 @@ class FlightTools:
                         fields['passenger_name'] = name_match.group(1).strip()
                         break
         
+        # app_logger.info(f"Extracted fields: {json.dumps(fields)}")
         return fields
 
 
 # Tool definitions using proper JSON schema format
-check_flight_document_TOOL = Tool(
+CHECK_FLIGHT_DOC_TOOL = Tool(
     name="check_flight_document",
     description="Extracts and verifies flight information from a ticket image including flight number, passenger name, departure/arrival airports, date, and seat assignment. Verifies the passenger name matches the user profile name.",
     parameters={
@@ -189,4 +205,4 @@ check_flight_document_TOOL = Tool(
     required=["image_path", "user_profile"]
 )
 
-FLIGHT_TOOLS = [check_flight_document_TOOL]
+FLIGHT_TOOLS = [CHECK_FLIGHT_DOC_TOOL]

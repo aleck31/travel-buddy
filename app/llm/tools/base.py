@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel
+from ...core import app_logger
 
 
 class Tool(BaseModel):
@@ -10,10 +11,10 @@ class Tool(BaseModel):
 
 
 class ToolResult(BaseModel):
+    """Result of a tool execution"""
     success: bool
     data: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    stage_data_update: Optional[Dict[str, Any]] = None  # For updating specific stage data fields
 
     def get_state_update(self) -> Dict[str, Any]:
         """
@@ -21,22 +22,21 @@ class ToolResult(BaseModel):
         This helps standardize how tools communicate state changes.
         """
         if not self.success or not self.data:
+            app_logger.info("No state update: Tool execution failed or no data")
             return {}
 
-        update = {}
+        # Map specific data fields to state updates
+        state_updates = {}
         
-        # Map tool results to appropriate state updates
         if "flight_info" in self.data:
-            update["flight_info"] = self.data["flight_info"]
-        elif "lounge_info" in self.data:
-            update["lounge_info"] = self.data["lounge_info"]
-        elif "order_info" in self.data:
-            update["order_info"] = self.data["order_info"]
-        
-        # Include any explicit stage data updates
-        if self.stage_data_update:
-            for key, value in self.stage_data_update.items():
-                if key not in update:
-                    update[key] = value
+            app_logger.info(f"Adding flight_info to state update: {self.data['flight_info']}")
+            state_updates["flight_info"] = self.data["flight_info"]
+        if "lounge_info" in self.data:
+            app_logger.info(f"Adding lounge_info to state update: {self.data['lounge_info']}")
+            state_updates["lounge_info"] = self.data["lounge_info"]
+        if "order_info" in self.data:
+            app_logger.info(f"Adding order_info to state update: {self.data['order_info']}")
+            state_updates["order_info"] = self.data["order_info"]
 
-        return update
+        app_logger.info(f"Final state update: {state_updates}")
+        return state_updates

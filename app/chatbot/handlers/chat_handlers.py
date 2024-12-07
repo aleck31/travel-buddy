@@ -1,7 +1,9 @@
 # chat_handlers.py handles UI/API level interactions
 from typing import List, Tuple
+from datetime import datetime
 import logging
 import re
+import json
 
 from ...core import app_logger
 from ...models.chat import ChatMessage, MessageRole, BookingStage
@@ -9,7 +11,6 @@ from ..session_service import session_service
 from ..data_service import data_service
 from third_party.membership.service import membership_service
 from app.llm.bedrock import BedrockLLM
-from app.llm.tools.base import Tool
 
 
 class ChatHandlers:
@@ -39,24 +40,24 @@ class ChatHandlers:
                 "user_profile": {
                     "first_name": profile.first_name,
                     "last_name": profile.last_name,
-                    "service": service,
                     "gender": profile.gender,
                     "preferred_language": profile.preferred_language,
                     "points": profile.points
                 },
-                "session_state": {
-                    "current_stage": BookingStage.INITIAL_ENGAGEMENT.value,
-                    "stage_data": session.stage_data.model_dump(),
+                "service": f'{service} booking',
+                "current_stage": BookingStage.INITIAL_ENGAGEMENT.value,
+                "session_state": {                    
+                    "stage_data": session.stage_data.model_dump() if session.stage_data else None,
                     "is_new_session": True
                 }
             }
 
-            prompt_template=f"The current conversation is in the {BookingStage.INITIAL_ENGAGEMENT.value} stage, Please refer to the INTERACTION GUIDELINES when engaging with user."
+            # greeting to LLM
+            prompt_template=f"It is {datetime.now()} at this moment, let's begin our conversation. Please note to follow the INTERACTION GUIDELINES."
             
-            # Generate greeting using Bedrock Claude
             with open("app/llm/prompts/travel_buddy_prompt.txt", "r") as f:
                 system_prompt = f.read()
-            
+
             # Create instance of BedrockLLM for static method
             llm = BedrockLLM()
             
@@ -104,6 +105,7 @@ class ChatHandlers:
 
         try:
             session = await session_service.get_or_create_session(user_id)
+            app_logger.info(f"Processing message in stage: {session.current_stage.value}")
             
             # Process message and get response
             result = await session_service.process_message(
@@ -112,6 +114,10 @@ class ChatHandlers:
                 message=message,
                 service=service
             )
+
+            # Log state updates if any
+            if "state" in result:
+                app_logger.info(f"Message processing resulted in state update: {json.dumps(result['state'])}")
 
             # Update chat history
             history.extend([
@@ -131,6 +137,7 @@ class ChatHandlers:
             
             # Return current stage info
             stage = session.current_stage
+            app_logger.info(f"Stage after message processing: {stage.value}")
             return "", history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
         except Exception as e:
@@ -153,6 +160,7 @@ class ChatHandlers:
         """Handle uploaded flight documents"""
         try:
             session = await session_service.get_or_create_session(user_id)
+            app_logger.info(f"Processing file upload in stage: {session.current_stage.value}")
             
             # Process the upload through session service using the file path directly
             result = await session_service.process_message(
@@ -162,6 +170,10 @@ class ChatHandlers:
                 service=service,
                 image_path=file_path  # Use the file path directly
             )
+
+            # Log state updates if any
+            if "state" in result:
+                app_logger.info(f"File upload processing resulted in state update: {json.dumps(result['state'])}")
 
             # Update chat history
             history.extend([
@@ -188,6 +200,7 @@ class ChatHandlers:
             
             # Return current stage info
             stage = session.current_stage
+            app_logger.info(f"Stage after file upload processing: {stage.value}")
             return history, points_display, profile_display, stage.value, BookingStage.get_stage_number(stage)
 
         except Exception as e:

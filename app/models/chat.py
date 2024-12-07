@@ -2,6 +2,11 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+from ..llm.tools.membership import CHECK_MEMBERSHIP_POINTS_TOOL
+from ..llm.tools.flight import CHECK_FLIGHT_DOC_TOOL
+from ..llm.tools.lounge import GET_AVAILABLE_LOUNGES_TOOL, STORE_LOUNGE_INFO_TOOL, BOOK_LOUNGE_TOOL
+from ..llm.tools.base import Tool
+from ..core import app_logger
 
 
 class MessageRole(str, Enum):
@@ -29,6 +34,38 @@ class BookingStage(str, Enum):
         if 1 <= number <= len(stages):
             return stages[number - 1]
         return BookingStage.INITIAL_ENGAGEMENT
+
+    @classmethod
+    def get_stage_requirements(cls, stage: "BookingStage") -> str:
+        """Get the requirements for completing the specified stage"""
+        requirements = {
+            cls.INITIAL_ENGAGEMENT: "Respond to user's first message to move to information collection.",
+            cls.INFO_COLLECTION: "Extract and store flight information to proceed.",
+            cls.LOUNGE_RECOMMENDATION: "Search available lounges and store selected lounge information.",
+            cls.CONFIRMATION: "Get user's confirmation to proceed with booking.",
+            cls.BOOKING_EXECUTION: "Complete the booking process and store order information.",
+            cls.POST_BOOKING: "Check membership points and provide post-booking service."
+        }
+        return requirements.get(stage, "No specific requirements.")
+
+    @classmethod
+    def get_stage_tools(cls, stage: "BookingStage") -> List[Tool]:
+        """Get the Tool instances available for the specified stage"""
+        # Create a mapping of stages to their available tools
+        stage_tools_mapping = {
+            cls.INITIAL_ENGAGEMENT: [],  # No tools needed for initial greeting
+            cls.INFO_COLLECTION: [CHECK_FLIGHT_DOC_TOOL],
+            cls.LOUNGE_RECOMMENDATION: [GET_AVAILABLE_LOUNGES_TOOL, STORE_LOUNGE_INFO_TOOL],
+            cls.CONFIRMATION: [STORE_LOUNGE_INFO_TOOL],
+            cls.BOOKING_EXECUTION: [BOOK_LOUNGE_TOOL],
+            cls.POST_BOOKING: [CHECK_MEMBERSHIP_POINTS_TOOL]
+        }
+        return stage_tools_mapping.get(stage, [])
+    
+    @classmethod
+    def get_stage_tools_name(cls, stage: "BookingStage") -> List[str]:
+        """Get the tool names available for the specified stage"""
+        return [tool.name for tool in cls.get_stage_tools(stage)]
 
 
 class ChatMessage(BaseModel):
@@ -74,20 +111,30 @@ class ChatSession(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     metadata: Optional[dict] = None
     current_stage: BookingStage = Field(default=BookingStage.INITIAL_ENGAGEMENT)
-    stage_data: StageData = Field(default_factory=StageData)
+    stage_data: Optional[StageData] = None
+
+    def initialize_stage_data(self):
+        """Initialize stage data if it doesn't exist"""
+        if not self.stage_data:
+            app_logger.info("Initializing new stage data")
+            self.stage_data = StageData()
     
     @property
     def flight_info(self) -> Optional[Dict[str, Any]]:
+        self.initialize_stage_data()
         return self.stage_data.flight_info
     
     @flight_info.setter
     def flight_info(self, value: Optional[Dict[str, Any]]):
+        self.initialize_stage_data()
+        app_logger.info(f"Setting flight info: {value}")
         self.stage_data.flight_info = value
         if value:
             self.stage_data.stage_completed_at = datetime.now().isoformat()
     
     @property
     def order_info(self) -> Optional[Dict[str, Any]]:
+        self.initialize_stage_data()
         return {
             "lounge_info": self.stage_data.lounge_info,
             "order_info": self.stage_data.order_info
@@ -95,7 +142,9 @@ class ChatSession(BaseModel):
     
     @order_info.setter
     def order_info(self, value: Optional[Dict[str, Any]]):
+        self.initialize_stage_data()
         if value:
+            app_logger.info(f"Setting order info: {value}")
             if "lounge_info" in value:
                 self.stage_data.lounge_info = value["lounge_info"]
             if "order_info" in value:
@@ -108,6 +157,8 @@ class ChatSession(BaseModel):
         Returns: (stage_name, stage_number)
         """
         if new_stage != self.current_stage:
+            app_logger.info(f"Updating stage from {self.current_stage.value} to {new_stage.value}")
+            self.initialize_stage_data()
             # Mark completion of current stage
             self.stage_data.stage_completed_at = datetime.now().isoformat()
             # Initialize new stage
@@ -123,6 +174,7 @@ class ChatSession(BaseModel):
 
     def is_stage_complete(self) -> bool:
         """Check if current stage is complete based on required data"""
+        self.initialize_stage_data()
         if self.current_stage == BookingStage.INITIAL_ENGAGEMENT:
             return True
         elif self.current_stage == BookingStage.INFO_COLLECTION:
@@ -138,6 +190,7 @@ class ChatSession(BaseModel):
         return False
 
     def model_dump(self) -> dict:
+        self.initialize_stage_data()
         return {
             "session_id": self.session_id,
             "user_id": self.user_id,

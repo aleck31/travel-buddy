@@ -72,11 +72,10 @@ async def store_lounge_info(lounge_id: str, lounge_name: str, arrival_time: date
     """
     try:
         # simplify this tool's functionality to only return selected lounge info in the specified format.
-        # Create a standardized lounge info object
         lounge_info = {
             "id": lounge_id,
             'name': lounge_name,
-            'arrival_time': arrival_time,
+            'arrival_time': arrival_time
         }
 
         return ToolResult(

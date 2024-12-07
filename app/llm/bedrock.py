@@ -1,6 +1,6 @@
 import json
 import boto3
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable, Awaitable, Union
 from ..core import settings, app_logger
 from .tools import Tool, ToolResult
 
@@ -17,9 +17,9 @@ class BedrockLLM:
         context: Dict[str, Any],
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        tools: Optional[List[Tool]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         use_rag: Optional[bool] = False
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         """
         Generate a response using the Bedrock LLM
         
@@ -28,11 +28,12 @@ class BedrockLLM:
             context: Context information to inform the response
             temperature: Controls randomness in generation
             max_tokens: Maximum tokens to generate
-            tools: Optional list of tools available to the model
+            tools: Optional list of dicts containing tool spec and function
+                  [{"tool": Tool, "function": Callable}]
             system_prompt: Optional system prompt to guide the model's behavior
             
         Returns:
-            Generated response string
+            Either a string response or a dict containing response and tool results
         """
         try:
             response = await self.client.generate_response(
@@ -73,10 +74,10 @@ class BedrockClient:
         context: Dict[str, Any],
         temperature: float = 0.7,
         max_tokens: int = 2048,
-        tools: Optional[List[Tool]] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         use_rag: Optional[bool] = False,
         max_recursions: int = 5
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         """Generate a response using Claude via AWS Bedrock with optional tool use"""
         try:
             # Format the initial message with proper structure
@@ -117,7 +118,7 @@ class BedrockClient:
                 request_params["toolConfig"] = {
                     "tools": [
                         {
-                            "toolSpec": self._convert_tool_to_spec(tool)
+                            "toolSpec": self._convert_tool_to_spec(tool["tool"])
                         } for tool in tools
                     ],
                     "toolChoice": {
@@ -133,6 +134,7 @@ class BedrockClient:
                 response=response,
                 messages=messages,
                 tool_config=request_params.get("toolConfig"),
+                tools=tools,
                 system=request_params.get("system"),
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -214,11 +216,12 @@ class BedrockClient:
         response: Dict[str, Any],
         messages: List[Dict[str, Any]],
         tool_config: Optional[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]],
         system: Optional[List[Dict[str, str]]],
         temperature: float,
         max_tokens: int,
         max_recursions: int
-    ) -> str:
+    ) -> Union[str, Dict[str, Any]]:
         """Process Bedrock response and handle tool use recursively"""
         if max_recursions <= 0:
             raise Exception("Maximum number of tool use recursions reached")
@@ -227,6 +230,7 @@ class BedrockClient:
         output = response.get("output", {})
         message = output.get("message", {})
         message_content = message.get("content", [])
+        stop_reason = response.get("stopReason")
         
         # Add model's response to conversation
         messages.append({
@@ -237,44 +241,47 @@ class BedrockClient:
         # Process each content item
         response_text = ""
         tool_uses = []
+        state_updates = {}
 
         for content in message_content:
-            if isinstance(content, dict):  # Ensure content is a dictionary
+            if isinstance(content, dict):
                 if "text" in content:
                     response_text += content["text"]
                 elif "toolUse" in content:
                     tool_use = content["toolUse"]
-                    if isinstance(tool_use, dict) and "name" in tool_use:  # Verify tool_use is a dict with name
+                    if isinstance(tool_use, dict) and "name" in tool_use:
                         tool_uses.append(tool_use)
 
-        if tool_uses:
-            # Handle tool uses
-            tool_results = []
+        # If stop reason is tool_use, execute tools and continue conversation
+        if stop_reason == "tool_use" and tool_uses and tools:
+            tool_results_messages = []
             
             for tool_use in tool_uses:
-                result = await self._execute_tool(tool_use)
+                app_logger.info(f"Use tool: {tool_use.get('name')}")
+                result = await self._execute_tool(tool_use, tools)
+                app_logger.info(f"{tool_use.get('name')} finished successful: {result.success}")
                 
-                tool_results.append({
+                # Get state updates from tool result
+                if result.success:
+                    tool_state = result.get_state_update()
+                    app_logger.info(f"Tool state update: {json.dumps(tool_state)}")
+                    state_updates.update(tool_state)
+                
+                tool_results_messages.append({
                     "role": "user",
                     "content": [
                         {
                             "toolResult": {
                                 "toolUseId": tool_use.get("toolUseId", ""),
-                                "content": [
-                                    {
-                                        "json": result.data if isinstance(result, ToolResult) and result.success else result
-                                    } if not isinstance(result, dict) or "error" not in result else {
-                                        "text": result["error"]
-                                    }
-                                ],
-                                "status": "success" if (isinstance(result, ToolResult) and result.success) or (isinstance(result, dict) and "error" not in result) else "error"
+                                "content": [{"json": result.data if result.success else {"error": result.error}}],
+                                "status": "success" if result.success else "error"
                             }
                         }
                     ]
                 })
 
             # Add tool results to conversation
-            messages.extend(tool_results)
+            messages.extend(tool_results_messages)
 
             # Continue conversation with tool results
             next_response = self._send_to_bedrock(
@@ -285,57 +292,73 @@ class BedrockClient:
                 max_tokens=max_tokens
             )
             
-            return await self._process_response(
+            final_response = await self._process_response(
                 response=next_response,
                 messages=messages,
                 tool_config=tool_config,
+                tools=tools,
                 system=system,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 max_recursions=max_recursions - 1
             )
 
-        # Return final response text if no tool uses
+            # If state updates exist, return both response and state
+            if state_updates:
+                if isinstance(final_response, str):
+                    return {
+                        "response": final_response,
+                        "state": state_updates
+                    }
+                elif isinstance(final_response, dict):
+                    if "state" in final_response:
+                        final_response["state"].update(state_updates)
+                    else:
+                        final_response["state"] = state_updates
+                    return final_response
+
+            return final_response
+
+        # Return final response text if no tool uses or end_turn
         return response_text
 
-    async def _execute_tool(self, tool_use: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_tool(
+        self, 
+        tool_use: Dict[str, Any], 
+        tools: List[Dict[str, Any]]
+    ) -> ToolResult:
         """Execute the requested tool and return results"""
         try:
             tool_name = tool_use.get("name")
             if not tool_name:
-                raise ValueError("Tool name not provided")
+                return ToolResult(success=False, error="Tool name not provided")
                 
             tool_input = tool_use.get("input", {})
             
-            # Get the tool function from the registered tools
-            from app.llm.tools.lounge import get_available_lounges, book_lounge
-            from app.llm.tools.flight import FlightTools
-            from app.llm.tools.membership import check_membership_points
+            # Find the tool function from the provided tools list
+            tool_func = next(
+                (t["function"] for t in tools if t["tool"].name == tool_name),
+                None
+            )
             
-            tools = {
-                "get_available_lounges": get_available_lounges,
-                "book_lounge": book_lounge,
-                "check_flight_document": FlightTools().check_flight_document,
-                "check_membership_points": check_membership_points
-            }
-            
-            if tool_name not in tools:
-                raise ValueError(f"Unknown tool: {tool_name}")
+            if not tool_func:
+                return ToolResult(success=False, error=f"Unknown tool: {tool_name}")
             
             # Execute the tool
-            result = await tools[tool_name](**tool_input)
+            result = await tool_func(**tool_input)
             
             if isinstance(result, ToolResult):
-                if result.success:
-                    return result.data
-                else:
-                    return {"error": result.error}
-            else:
                 return result
+            else:
+                # Convert non-ToolResult to ToolResult
+                return ToolResult(success=True, data=result)
                 
         except Exception as e:
             app_logger.error(f"Error executing tool {tool_name if 'tool_name' in locals() else 'unknown'}: {str(e)}")
-            return {"error": str(e)}
+            return ToolResult(
+                success=False, 
+                error=f"Error executing tool {tool_name if 'tool_name' in locals() else 'unknown'}: {str(e)}"
+            )
 
     def _convert_tool_to_spec(self, tool: Tool) -> Dict[str, Any]:
         """Convert tool to Bedrock tool specification format"""
@@ -343,7 +366,10 @@ class BedrockClient:
             "name": tool.name,
             "description": tool.description,
             "inputSchema": {
-                "json": tool.parameters
+                "json": {
+                    **tool.parameters,
+                    "required": tool.required
+                }
             }
         }
 
