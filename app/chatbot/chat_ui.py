@@ -27,7 +27,7 @@ class ChatInterface:
                 welcome_user_id = gr.Textbox(
                     label="User ID",
                     placeholder="Enter your user ID",
-                    value="test_user_1"
+                    value="user_test1"
                 )
                 welcome_service = gr.Dropdown(
                     choices=["Choose...", "Lounge", "Restaurant", "Limousine", "Gifts"],
@@ -76,24 +76,6 @@ class ChatInterface:
                             clear_btn = gr.Button("Clear Chat")
 
                     with gr.Column(scale=1):
-                        with gr.Accordion("Session Info", open=False):
-                            user_id = gr.Textbox(
-                                label="User ID",
-                                interactive=False
-                            )
-                            service = gr.Dropdown(
-                                choices=["Lounge", "Restaurant", "Limousine", "Gifts"],
-                                label="Service",
-                                interactive=False
-                            )
-                            profile_display = gr.Markdown(
-                                "User Profile: Loading..."
-                            )
-                            points_display = gr.Markdown(
-                                "Available Points: Checking..."
-                            )
-                            with gr.Row():
-                                refresh_btn = gr.Button("🔄 Refresh Info")
 
                         # Service Progress Section
                         with gr.Accordion("Service Progress", open=True):
@@ -115,6 +97,26 @@ class ChatInterface:
                                 interactive=False
                             )
 
+                        with gr.Accordion("Session Info", open=False):
+                            user_id = gr.Textbox(
+                                label="User ID",
+                                interactive=False
+                            )
+                            service = gr.Dropdown(
+                                choices=["Lounge", "Restaurant", "Limousine", "Gifts"],
+                                label="Service",
+                                visible=False,
+                                interactive=False
+                            )
+                            profile_display = gr.Markdown(
+                                "User Profile: Loading..."
+                            )
+                            points_display = gr.Markdown(
+                                "Available Points: Checking..."
+                            )
+                            with gr.Row():
+                                refresh_btn = gr.Button("🔄 Refresh Info")
+
             def update_visibility(user_id: str, service: str) -> Tuple[Dict, Dict]:
                 if service == "Choose...":
                     return (
@@ -132,7 +134,7 @@ class ChatInterface:
                 inputs=[welcome_user_id, welcome_service],
                 outputs=[
                     user_id,
-                    service,
+                    service_choose,
                     chatbot,
                     points_display,
                     profile_display,
@@ -148,13 +150,13 @@ class ChatInterface:
 
             submit_btn.click(
                 chat_handlers.handle_message,
-                inputs=[msg, chatbot, user_id, service],
+                inputs=[msg, chatbot, user_id, service_choose],
                 outputs=[msg, chatbot, points_display, profile_display, current_stage, progress_bar]
             )
 
             msg.submit(
                 chat_handlers.handle_message,
-                inputs=[msg, chatbot, user_id, service],
+                inputs=[msg, chatbot, user_id, service_choose],
                 outputs=[msg, chatbot, points_display, profile_display, current_stage, progress_bar]
             )
 
@@ -166,7 +168,7 @@ class ChatInterface:
 
             upload_btn.upload(
                 chat_handlers.handle_upload,
-                inputs=[upload_btn, chatbot, user_id, service],
+                inputs=[upload_btn, chatbot, user_id, service_choose],
                 outputs=[chatbot, points_display, profile_display, current_stage, progress_bar]
             )
 

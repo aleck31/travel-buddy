@@ -38,6 +38,7 @@ class ChatHandlers:
             # Create context for LLM
             context = {
                 "user_profile": {
+                    "user_id": user_id,
                     "first_name": profile.first_name,
                     "last_name": profile.last_name,
                     "gender": profile.gender,
