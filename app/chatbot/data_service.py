@@ -65,6 +65,12 @@ class DataService:
             )
             
             if sessions:
+                # Get the latest non-completed session first
+                active_sessions = [s for s in sessions if not s.get('is_completed', False)]
+                if active_sessions:
+                    return max(active_sessions, key=lambda x: x.get('updated_at', ''))
+                
+                # If no active sessions, return the latest completed session
                 return max(sessions, key=lambda x: x.get('updated_at', ''))
             return None
         except Exception as e:
